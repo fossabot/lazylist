@@ -1,0 +1,28 @@
+services:
+  lazy-auth:
+    build:
+      context: ./src/api/auth/
+      dockerfile: Containerfile
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      timeout: 5s
+      retries: 3
+  lazy-tasks:
+    build:
+      context: ./src/api/tasks/
+      dockerfile: Containerfile
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      timeout: 5s
+      retries: 3
+  lazy-gateway:
+    ports:
+      - 8000:8000
+    build:
+      context: ./src/www/
+      dockerfile: Containerfile
+    depends_on:
+      lazy-tasks:
+        condition: service_healthy
+      lazy-auth:
+        condition: service_healthy
