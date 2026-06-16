@@ -28,3 +28,18 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  auth-service:
+    build: ./auth-service
+    environment:
+      DB_HOST: db-users
+      DB_PORT: "3306"
+      DB_USER: lazy
+      DB_PASSWORD: lazypass
+      DB_NAME: lazylist_users
+      JWT_SECRET: troque-este-segredo-no-k8s
+    ports:
+      - "5001:5001"
+    depends_on:
+      db-users:
+        condition: service_healthy
