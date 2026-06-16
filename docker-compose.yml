@@ -45,3 +45,18 @@ services:
     depends_on:
       db-users:
         condition: service_healthy
+
+  task-service:
+    build: ./task-service
+    environment:
+      DB_HOST: db-tasks
+      DB_PORT: "3306"
+      DB_USER: lazy
+      DB_PASSWORD: lazypass
+      DB_NAME: lazylist_tasks
+      JWT_SECRET: troque-este-segredo-no-k8s
+    ports:
+      - "5002:5002"
+    depends_on:
+      db-tasks:
+        condition: service_healthy
