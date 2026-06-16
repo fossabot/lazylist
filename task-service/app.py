@@ -98,12 +98,18 @@ def create_app():
         db.session.commit()
         return jsonify(task.to_dict()), 201
 
-    @app.get("/tasks")                   # RF05
+    @app.get("/tasks")                   # RF05 + RF08
     @token_required
     def list_tasks():
         query = Task.query
         if request.user_role != "admin":
             query = query.filter_by(user_id=request.user_id)
+        date_filter = request.args.get("date")          # RF08
+        if date_filter:
+            due, err = parse_due_date(date_filter)
+            if err:
+                return jsonify({"error": err}), 400
+            query = query.filter_by(due_date=due)
         return jsonify([t.to_dict() for t in query.order_by(Task.due_date).all()])
 
     @app.get("/tasks/<int:task_id>")     # RF09
