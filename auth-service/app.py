@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 import uuid
@@ -6,9 +7,13 @@ from functools import wraps
 
 import jwt
 from flask import Flask, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from models import db, User, RevokedToken
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALGORITHM = "HS256"
@@ -105,11 +110,14 @@ def create_app():
     init_db(app)
     seed_admin(app)
 
+    limiter = Limiter(get_remote_address, app=app, default_limits=["200 per hour"])
+
     @app.get("/health")
     def health():
         return jsonify({"status": "ok"})
 
     @app.post("/auth/register")          # RF01
+    @limiter.limit("10 per minute")
     def register():
         data = request.get_json(silent=True) or {}
         for field in ("username", "email", "password"):
@@ -125,14 +133,17 @@ def create_app():
         )
         db.session.add(user)
         db.session.commit()
+        app.logger.info(f"register user_id={user.id} email={user.email}")
         return jsonify({"id": user.id, "username": user.username}), 201
 
     @app.post("/auth/login")             # RF02
+    @limiter.limit("5 per minute")
     def login():
         data = request.get_json(silent=True) or {}
         user = User.query.filter_by(email=data.get("email")).first()
         if not user or not check_password_hash(user.password_hash, data.get("password", "")):
             return jsonify({"error": "credenciais invalidas"}), 401
+        app.logger.info(f"login user_id={user.id}")
         return jsonify({"access_token": encode_token(user)})
 
     @app.post("/auth/logout")            # RF03

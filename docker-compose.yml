@@ -72,3 +72,10 @@ services:
     depends_on:
       - auth-service
       - task-service
+
+  web:
+    build: ./web
+    ports:
+      - "8000:80"
+    depends_on:
+      - api-gateway

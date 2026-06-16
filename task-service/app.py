@@ -1,6 +1,9 @@
+import logging
 import os
 import time
 from functools import wraps
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 import jwt
 from flask import Flask, request, jsonify
@@ -96,6 +99,7 @@ def create_app():
         )
         db.session.add(task)
         db.session.commit()
+        app.logger.info(f"task_create user_id={request.user_id} task_id={task.id}")
         return jsonify(task.to_dict()), 201
 
     @app.get("/tasks")                   # RF05 + RF08
@@ -147,6 +151,7 @@ def create_app():
             return error
         db.session.delete(task)
         db.session.commit()
+        app.logger.info(f"task_delete user_id={request.user_id} task_id={task_id}")
         return jsonify({"message": "tarefa removida"})
 
     return app
