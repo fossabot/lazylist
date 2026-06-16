@@ -61,6 +61,88 @@ def create_app():
     def health():
         return jsonify({"status": "ok"})
 
+    from datetime import date
+
+    def parse_due_date(value):
+        if not value:
+            return None, None
+        try:
+            return date.fromisoformat(value), None
+        except ValueError:
+            return None, "due_date invalida (use YYYY-MM-DD)"
+
+    def get_accessible_task(task_id):
+        task = Task.query.get(task_id)
+        if not task:
+            return None, (jsonify({"error": "tarefa nao encontrada"}), 404)
+        if request.user_role != "admin" and task.user_id != request.user_id:
+            return None, (jsonify({"error": "acesso negado"}), 403)
+        return task, None
+
+    @app.post("/tasks")                  # RF04
+    @token_required
+    def create_task():
+        data = request.get_json(silent=True) or {}
+        if not data.get("title"):
+            return jsonify({"error": "title obrigatorio"}), 400
+        due, err = parse_due_date(data.get("due_date"))
+        if err:
+            return jsonify({"error": err}), 400
+        task = Task(
+            user_id=request.user_id,
+            title=data["title"],
+            description=data.get("description", ""),
+            due_date=due,
+        )
+        db.session.add(task)
+        db.session.commit()
+        return jsonify(task.to_dict()), 201
+
+    @app.get("/tasks")                   # RF05
+    @token_required
+    def list_tasks():
+        query = Task.query
+        if request.user_role != "admin":
+            query = query.filter_by(user_id=request.user_id)
+        return jsonify([t.to_dict() for t in query.order_by(Task.due_date).all()])
+
+    @app.get("/tasks/<int:task_id>")     # RF09
+    @token_required
+    def get_task(task_id):
+        task, error = get_accessible_task(task_id)
+        if error:
+            return error
+        return jsonify(task.to_dict())
+
+    @app.put("/tasks/<int:task_id>")     # RF06
+    @token_required
+    def update_task(task_id):
+        task, error = get_accessible_task(task_id)
+        if error:
+            return error
+        data = request.get_json(silent=True) or {}
+        if "title" in data:
+            task.title = data["title"]
+        if "description" in data:
+            task.description = data["description"]
+        if "due_date" in data:
+            due, err = parse_due_date(data["due_date"])
+            if err:
+                return jsonify({"error": err}), 400
+            task.due_date = due
+        db.session.commit()
+        return jsonify(task.to_dict())
+
+    @app.delete("/tasks/<int:task_id>")  # RF07
+    @token_required
+    def delete_task(task_id):
+        task, error = get_accessible_task(task_id)
+        if error:
+            return error
+        db.session.delete(task)
+        db.session.commit()
+        return jsonify({"message": "tarefa removida"})
+
     return app
 
 
