@@ -1,0 +1,81 @@
+services:
+  db-users:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: lazylist_users
+      MYSQL_USER: lazy
+      MYSQL_PASSWORD: lazypass
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  db-tasks:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: lazylist_tasks
+      MYSQL_USER: lazy
+      MYSQL_PASSWORD: lazypass
+    ports:
+      - "3308:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  auth-service:
+    build: ./auth-service
+    environment:
+      DB_HOST: db-users
+      DB_PORT: "3306"
+      DB_USER: lazy
+      DB_PASSWORD: lazypass
+      DB_NAME: lazylist_users
+      JWT_SECRET: troque-este-segredo-no-k8s
+      ADMIN_EMAIL: admin@lazylist.com
+      ADMIN_PASSWORD: admin123
+    ports:
+      - "5001:5001"
+    depends_on:
+      db-users:
+        condition: service_healthy
+
+  task-service:
+    build: ./task-service
+    environment:
+      DB_HOST: db-tasks
+      DB_PORT: "3306"
+      DB_USER: lazy
+      DB_PASSWORD: lazypass
+      DB_NAME: lazylist_tasks
+      JWT_SECRET: troque-este-segredo-no-k8s
+    ports:
+      - "5002:5002"
+    depends_on:
+      db-tasks:
+        condition: service_healthy
+
+  api-gateway:
+    build: ./api-gateway
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:5001
+      TASK_SERVICE_URL: http://task-service:5002
+      JWT_SECRET: troque-este-segredo-no-k8s
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-service
+      - task-service
+
+  web:
+    build: ./web
+    ports:
+      - "8000:80"
+    depends_on:
+      - api-gateway
